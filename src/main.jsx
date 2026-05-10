@@ -111,9 +111,17 @@ function Scanner({ onResult, onClose }) {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const vCams = devices.filter(d => d.kind === "videoinput");
       setCameras(vCams);
-      const deviceId = vCams[idx % vCams.length]?.deviceId;
-      const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" } };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Siempre intentar cámara trasera primero
+      const constraints = vCams.length > 0 && idx > 0
+        ? { video: { deviceId: { exact: vCams[idx % vCams.length]?.deviceId } } }
+        : { video: { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch(_) {
+        // Si exact environment falla, intentar sin exact
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      }
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
       setReady(true);
@@ -192,21 +200,44 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
   const processImage = async (dataUrl) => {
     setBusy("Analizando imagen con IA..."); setPreviewImage(dataUrl); setUseAsCover(false);
     try {
-      const parsed = await callClaudeImage(dataUrl.split(",")[1],
-        `Analiza esta imagen de un libro (portada, lomo, contraportada o código de barras).
-Extrae toda la información visible. Si hay código de barras EAN-13, lee el número de 13 dígitos debajo.
-SOLO JSON sin backticks: {"title":"","author":"","year":0,"publisher":"","isbn":"","genre":"","language":"","translator":"","edition":"","isCover":true,"found":true}`
+      const base64 = dataUrl.split(",")[1];
+      const parsed = await callClaudeImage(base64,
+        `Eres un experto bibliotecario con visión muy precisa. Analiza esta imagen de un libro.
+Puede ser portada, lomo, contraportada o foto del código de barras ISBN.
+
+EXTRAE con máxima atención:
+- Título completo (incluyendo subtítulo si lo hay)
+- Todos los autores o coautores
+- Traductor si aparece
+- Editorial
+- Año de publicación
+- Número de edición
+- ISBN: busca el número de 13 dígitos en texto debajo del código de barras, o junto a la palabra "ISBN"
+- Si es portada principal: isCover true
+
+Devuelve SOLO este JSON sin backticks ni texto adicional:
+{"title":"","author":"","year":0,"publisher":"","isbn":"","genre":"","language":"","translator":"","edition":"","isCover":true,"found":true}
+
+Si no puedes leer un campo déjalo vacío. "found" es false solo si la imagen claramente no es de un libro.`
       );
       if (!parsed?.found) { setPreviewImage(null); setBusy(""); return; }
       setUseAsCover(parsed.isCover === true);
       setForm(f => {
         const m = {...f};
-        ["title","author","year","publisher","isbn","genre","language","translator","edition"].forEach(k => { if(parsed[k]) m[k]=parsed[k]; });
+        if (parsed.title) m.title = parsed.title;
+        if (parsed.author) m.author = parsed.author;
+        if (parsed.year) m.year = parsed.year;
+        if (parsed.publisher) m.publisher = parsed.publisher;
+        if (parsed.isbn) m.isbn = parsed.isbn;
+        if (parsed.genre) m.genre = parsed.genre;
+        if (parsed.language) m.language = parsed.language;
+        if (parsed.translator) m.translator = parsed.translator;
+        if (parsed.edition) m.edition = parsed.edition;
         return m;
       });
       if (parsed.isbn) await fetchByISBN(parsed.isbn, false);
       else if (parsed.title && parsed.author) await fetchEditorial(parsed.title, parsed.author);
-    } catch(e) {}
+    } catch(e) { console.error("Error procesando imagen:", e); }
     setBusy("");
   };
 
@@ -688,7 +719,7 @@ function App() {
       </Panel>
 
       <Panel show={showForm}>
-        <BookForm initial={editBook} onScan={()=>{setShowForm(false);setShowScanner(true);}}
+        {showForm && <BookForm key={editBook?.id || "new-"+Date.now()} initial={editBook} onScan={()=>{setShowForm(false);setShowScanner(true);}}
           onSave={async form=>{
             const clean={...form}; delete clean._scan;
             const payload={...clean, editorial:JSON.stringify(clean.editorial||{}), ratings:JSON.stringify(clean.ratings||[])};
@@ -696,7 +727,7 @@ function App() {
             else { const res=await db.insert("books",{...payload,added_by:currentUser.id}); if(res[0])setBooks(bs=>[...bs,{...res[0],editorial:clean.editorial,ratings:clean.ratings||[]}]); notify("Libro añadido"); }
             setShowForm(false); setEditBook(null);
           }}
-          onCancel={()=>{setShowForm(false);setEditBook(null);}}/>
+          onCancel={()=>{setShowForm(false);setEditBook(null);}}/> }
       </Panel>
 
       <Panel show={!!selectedBook}>
