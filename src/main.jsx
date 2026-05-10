@@ -513,6 +513,7 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [editBook, setEditBook] = useState(null);
+  const [formKey, setFormKey] = useState(0);
   const [loginData, setLoginData] = useState({ email:"", password:"" });
   const [loginError, setLoginError] = useState("");
   const [toast, setToast] = useState("");
@@ -614,8 +615,8 @@ function App() {
           </div>
           {can("add") && activeSection==="catalog" && (
             <div style={{ display:"flex", gap:8 }}>
-              <Btn onClick={()=>{setEditBook(null);setShowScanner(true);setShowForm(false);}} variant="dark" small>📷</Btn>
-              <Btn onClick={()=>{setEditBook(null);setShowForm(true);setShowScanner(false);}} small>+ Añadir</Btn>
+              <Btn onClick={()=>{ setEditBook(null); setFormKey(k=>k+1); setShowScanner(true); setShowForm(false); }} variant="dark" small>📷</Btn>
+              <Btn onClick={()=>{ setEditBook(null); setFormKey(k=>k+1); setShowForm(true); setShowScanner(false); }} small>+ Añadir</Btn>
             </div>
           )}
         </div>
@@ -719,15 +720,29 @@ function App() {
       </Panel>
 
       <Panel show={showForm}>
-        {showForm && <BookForm key={editBook?.id || "new-"+Date.now()} initial={editBook} onScan={()=>{setShowForm(false);setShowScanner(true);}}
+        {showForm && <BookForm
+          key={formKey}
+          initial={editBook}
+          onScan={()=>{setShowForm(false);setShowScanner(true);}}
           onSave={async form=>{
             const clean={...form}; delete clean._scan;
             const payload={...clean, editorial:JSON.stringify(clean.editorial||{}), ratings:JSON.stringify(clean.ratings||[])};
-            if (editBook?.id) { await db.update("books",editBook.id,payload); setBooks(bs=>bs.map(b=>b.id===editBook.id?{...b,...clean}:b)); notify("Libro actualizado"); }
-            else { const res=await db.insert("books",{...payload,added_by:currentUser.id}); if(res[0])setBooks(bs=>[...bs,{...res[0],editorial:clean.editorial,ratings:clean.ratings||[]}]); notify("Libro añadido"); }
-            setShowForm(false); setEditBook(null);
+            try {
+              if (editBook?.id) {
+                await db.update("books", editBook.id, payload);
+                setBooks(bs=>bs.map(b=>b.id===editBook.id?{...b,...clean}:b));
+                notify("Libro actualizado");
+              } else {
+                const res = await db.insert("books", {...payload, added_by:currentUser.id});
+                if (res[0]) setBooks(bs=>[...bs,{...res[0], editorial:clean.editorial, ratings:clean.ratings||[]}]);
+                notify("Libro añadido");
+              }
+            } catch(e) { alert("Error al guardar: "+e.message); }
+            setShowForm(false);
+            setEditBook(null);
+            setFormKey(k=>k+1);
           }}
-          onCancel={()=>{setShowForm(false);setEditBook(null);}}/> }
+          onCancel={()=>{ setShowForm(false); setEditBook(null); setFormKey(k=>k+1); }}/> }
       </Panel>
 
       <Panel show={!!selectedBook}>
