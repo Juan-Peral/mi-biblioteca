@@ -729,15 +729,19 @@ function App() {
             const payload={...clean, editorial:JSON.stringify(clean.editorial||{}), ratings:JSON.stringify(clean.ratings||[])};
             try {
               if (editBook?.id) {
-                await db.update("books", editBook.id, payload);
+                const res = await db.update("books", editBook.id, payload);
+                console.log("UPDATE result:", JSON.stringify(res));
                 setBooks(bs=>bs.map(b=>b.id===editBook.id?{...b,...clean}:b));
                 notify("Libro actualizado");
               } else {
+                console.log("INSERT payload:", JSON.stringify(payload));
                 const res = await db.insert("books", {...payload, added_by:currentUser.id});
+                console.log("INSERT result:", JSON.stringify(res));
+                if (res?.error) { alert("Error Supabase: " + JSON.stringify(res.error)); return; }
                 if (res[0]) setBooks(bs=>[...bs,{...res[0], editorial:clean.editorial, ratings:clean.ratings||[]}]);
                 notify("Libro añadido");
               }
-            } catch(e) { alert("Error al guardar: "+e.message); }
+            } catch(e) { alert("Error al guardar: "+e.message); console.error(e); }
             setShowForm(false);
             setEditBook(null);
             setFormKey(k=>k+1);
