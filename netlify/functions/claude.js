@@ -1,6 +1,16 @@
 exports.handler = async (event) => {
-  const body = JSON.parse(event.body);
   const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 200, headers, body: "" };
+  }
+
+  let body;
+  try {
+    body = JSON.parse(event.body);
+  } catch(e) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON" }) };
+  }
 
   // ── BÚSQUEDA POR ISBN ──────────────────────────────────────────────────────
   if (body.isbn) {
@@ -24,31 +34,26 @@ exports.handler = async (event) => {
           })
         };
       }
-    } catch(e) {}
-    return { statusCode: 200, headers, body: JSON.stringify({ found: false }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ found: false }) };
+    } catch(e) {
+      return { statusCode: 200, headers, body: JSON.stringify({ found: false, error: e.message }) };
+    }
   }
 
   // ── ANÁLISIS DE IMAGEN con Google Gemini ──────────────────────────────────
   if (body.image) {
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_KEY) {
+      return { statusCode: 500, headers, body: JSON.stringify({ found: false, error: "GEMINI_API_KEY not set" }) };
+    }
+
+    const prompt = `Eres un experto bibliotecario. Analiza esta imagen de un libro (portada, lomo, contraportada o código de barras).
+Extrae toda la información visible: título completo con subtítulo, todos los autores, traductor, editorial, año, edición, ISBN (número de 13 dígitos bajo el código de barras).
+Si es la portada principal: isCover true.
+Devuelve SOLO este JSON sin backticks: {"title":"","author":"","year":0,"publisher":"","isbn":"","language":"","translator":"","edition":"","isCover":true,"found":true}
+Si no es imagen de un libro: {"found":false}`;
+
     try {
-      const GEMINI_KEY = process.env.GEMINI_API_KEY;
-      const prompt = `Eres un experto bibliotecario. Analiza esta imagen de un libro.
-Puede ser portada, lomo, contraportada o foto del código de barras/ISBN.
-Extrae TODA la información visible con máxima precisión:
-- Título completo (con subtítulo si lo hay)
-- Todos los autores o coautores
-- Traductor si aparece
-- Editorial
-- Año de publicación
-- Número de edición
-- ISBN: el número de 13 dígitos en texto debajo del código de barras, o junto a la palabra ISBN
-- Si es la portada principal del libro: isCover true
-
-Devuelve SOLO este JSON sin backticks ni texto adicional:
-{"title":"","author":"","year":0,"publisher":"","isbn":"","language":"","translator":"","edition":"","isCover":true,"found":true}
-
-Si no puedes leer un campo déjalo vacío. "found" es false solo si claramente no es imagen de un libro.`;
-
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
         {
@@ -65,15 +70,22 @@ Si no puedes leer un campo déjalo vacío. "found" es false solo si claramente n
           })
         }
       );
+
+      if (!r.ok) {
+        const errText = await r.text();
+        return { statusCode: 200, headers, body: JSON.stringify({ found: false, error: `Gemini error ${r.status}: ${errText}` }) };
+      }
+
       const d = await r.json();
       const text = d.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
       return { statusCode: 200, headers, body: JSON.stringify(parsed) };
+
     } catch(e) {
-      return { statusCode: 500, headers, body: JSON.stringify({ found: false, error: e.message }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ found: false, error: e.message }) };
     }
   }
 
-  return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request" }) };
+  return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request — send isbn or image" }) };
 };
