@@ -242,15 +242,62 @@ Si no puedes leer un campo déjalo vacío. "found" es false solo si la imagen cl
   };
 
   const fetchByISBN = async (isbn, updateIsbn=true) => {
-    setBusy("Buscando datos por ISBN..."); const clean = isbn.replace(/-/g,""); let found = false;
-    try { const r=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`); const d=await r.json(); const b=d[`ISBN:${clean}`];
-      if (b?.title) { setForm(f=>({...f,title:b.title||f.title,author:b.authors?.map(a=>a.name).join(", ")||f.author,year:b.publish_date?parseInt(b.publish_date)||f.year:f.year,publisher:b.publishers?.[0]?.name||f.publisher,...(updateIsbn?{isbn}:{})})); found=true; }
+    setBusy("Buscando datos por ISBN..."); 
+    const clean = isbn.replace(/-/g,"");
+    let found = false;
+
+    // 1) Netlify Function → Google Books (mejor cobertura libros españoles)
+    try {
+      const r = await fetch("/.netlify/functions/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isbn: clean })
+      });
+      const d = await r.json();
+      if (d.found && d.title) {
+        setForm(f => ({...f,
+          title: d.title || f.title,
+          author: d.author || f.author,
+          year: d.year || f.year,
+          publisher: d.publisher || f.publisher,
+          language: d.language || f.language,
+          genre: d.genre || f.genre,
+          cover: d.cover || f.cover,
+          ...(updateIsbn ? {isbn} : {})
+        }));
+        found = true;
+      }
     } catch(_) {}
-    if (!found) try { const r=await fetch(`https://openlibrary.org/search.json?isbn=${clean}&limit=1`); const d=await r.json(); const b=d.docs?.[0];
-      if (b?.title) { setForm(f=>({...f,title:b.title||f.title,author:b.author_name?.[0]||f.author,year:b.first_publish_year||f.year,...(updateIsbn?{isbn}:{})})); found=true; }
-    } catch(_) {}
-    if (updateIsbn && !found) setForm(f=>({...f,isbn}));
-    setForm(f => { if(f.title&&f.author) fetchEditorial(f.title,f.author); return f; });
+
+    // 2) Open Library como respaldo
+    if (!found) {
+      try {
+        const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
+        const d = await r.json();
+        const b = d[`ISBN:${clean}`];
+        if (b?.title) {
+          setForm(f => ({...f,
+            title: b.title || f.title,
+            author: b.authors?.map(a=>a.name).join(", ") || f.author,
+            year: b.publish_date ? parseInt(b.publish_date) || f.year : f.year,
+            publisher: b.publishers?.[0]?.name || f.publisher,
+            ...(updateIsbn ? {isbn} : {})
+          }));
+          found = true;
+        }
+      } catch(_) {}
+    }
+
+    if (updateIsbn && !found) {
+      setForm(f => ({...f, isbn}));
+      alert("No se encontró el libro con ese ISBN. Por favor rellena los datos manualmente.");
+    }
+
+    // Buscar historia editorial si tenemos título y autor
+    setForm(f => {
+      if (f.title && f.author) fetchEditorial(f.title, f.author);
+      return f;
+    });
     setBusy("");
   };
 
