@@ -198,28 +198,16 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
   const toBase64 = f => new Promise((res,rej) => { const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(f); });
 
   const processImage = async (dataUrl) => {
+    const processImage = async (dataUrl) => {
     setBusy("Analizando imagen con IA..."); setPreviewImage(dataUrl); setUseAsCover(false);
     try {
       const base64 = dataUrl.split(",")[1];
-      const parsed = await callClaudeImage(base64,
-        `Eres un experto bibliotecario con visión muy precisa. Analiza esta imagen de un libro.
-Puede ser portada, lomo, contraportada o foto del código de barras ISBN.
-
-EXTRAE con máxima atención:
-- Título completo (incluyendo subtítulo si lo hay)
-- Todos los autores o coautores
-- Traductor si aparece
-- Editorial
-- Año de publicación
-- Número de edición
-- ISBN: busca el número de 13 dígitos en texto debajo del código de barras, o junto a la palabra "ISBN"
-- Si es portada principal: isCover true
-
-Devuelve SOLO este JSON sin backticks ni texto adicional:
-{"title":"","author":"","year":0,"publisher":"","isbn":"","genre":"","language":"","translator":"","edition":"","isCover":true,"found":true}
-
-Si no puedes leer un campo déjalo vacío. "found" es false solo si la imagen claramente no es de un libro.`
-      );
+      const r = await fetch("/.netlify/functions/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 })
+      });
+      const parsed = await r.json();
       if (!parsed?.found) { setPreviewImage(null); setBusy(""); return; }
       setUseAsCover(parsed.isCover === true);
       setForm(f => {
@@ -229,7 +217,6 @@ Si no puedes leer un campo déjalo vacío. "found" es false solo si la imagen cl
         if (parsed.year) m.year = parsed.year;
         if (parsed.publisher) m.publisher = parsed.publisher;
         if (parsed.isbn) m.isbn = parsed.isbn;
-        if (parsed.genre) m.genre = parsed.genre;
         if (parsed.language) m.language = parsed.language;
         if (parsed.translator) m.translator = parsed.translator;
         if (parsed.edition) m.edition = parsed.edition;
@@ -237,7 +224,7 @@ Si no puedes leer un campo déjalo vacío. "found" es false solo si la imagen cl
       });
       if (parsed.isbn) await fetchByISBN(parsed.isbn, false);
       else if (parsed.title && parsed.author) await fetchEditorial(parsed.title, parsed.author);
-    } catch(e) { console.error("Error procesando imagen:", e); }
+    } catch(e) { console.error("Error analizando imagen:", e); }
     setBusy("");
   };
 
