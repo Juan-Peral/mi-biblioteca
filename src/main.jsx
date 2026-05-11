@@ -1,28 +1,42 @@
 import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 
+// ── SUPABASE ───────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://qmciftrozaurmcnrhumi.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtY2lmdHJvemF1cm1jbnJodW1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDY2ODksImV4cCI6MjA5Mzk4MjY4OX0.qqoUeSUh6A3Rnowgk84F9ows-OHSZiGXS2zRtY5thVs";
-const MODEL = "claude-sonnet-4-20250514";
 
 const db = {
   async get(table) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
     return r.json();
   },
   async insert(table, data) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json", Prefer:"return=representation" }, body:JSON.stringify(data) });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(data)
+    });
     return r.json();
   },
   async update(table, id, data) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method:"PATCH", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, "Content-Type":"application/json", Prefer:"return=representation" }, body:JSON.stringify(data) });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(data)
+    });
     return r.json();
   },
   async delete(table, id) {
-    await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method:"DELETE", headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}` } });
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
   }
 };
 
+// ── CONSTANTES ─────────────────────────────────────────────────────────────────
 const DEWEY = ["000 - Generalidades","100 - Filosofía y Psicología","200 - Religión","300 - Ciencias Sociales","400 - Lenguaje","500 - Ciencias Naturales","600 - Tecnología","700 - Arte y Recreación","800 - Literatura","900 - Historia y Geografía"];
 const GENRES = ["Novela","Cuento","Poesía","Teatro","Ensayo","Historia","Biografía","Ciencia","Filosofía","Arte","Derecho","Economía","Medicina","Informática","Viajes","Infantil","Juvenil","Otro"];
 const AGES = ["Infantil (0-8)","Juvenil (9-14)","Adolescente (15-17)","Adulto","Todas las edades"];
@@ -30,14 +44,13 @@ const SITUATIONS = ["Ocio y entretenimiento","Estudio y consulta","Viaje","Profe
 const STATUSES = ["Disponible","Prestado","En lectura","Deteriorado"];
 const ROLES = { admin:"Administrador", editor:"Editor", user:"Usuario", guest:"Invitado" };
 
+// ── ESTILOS ────────────────────────────────────────────────────────────────────
 const C = {
   bg:"#1a1f2e", sidebar:"#16213e", card:"#1e2640",
   accent:"#4f8ef7", success:"#2ecc71", warning:"#f39c12",
   danger:"#e74c3c", info:"#3498db", text:"#e8eaf0", textSec:"#8892a4",
   border:"#2a3352", inputBg:"#141929", gold:"#f0c040"
 };
-
-const isMobile = () => window.innerWidth < 768;
 
 const css = `
   *, *::before, *::after { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -47,24 +60,9 @@ const css = `
   input:focus,select:focus,textarea:focus { border-color:${C.accent}; }
   select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238892a4' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
   select option { background:${C.inputBg}; }
-  label { font-size:12px; color:${C.textSec}; display:block; margin-bottom:4px; font-weight:500; letter-spacing:0.3px; }
+  label { font-size:12px; color:${C.textSec}; display:block; margin-bottom:4px; font-weight:500; }
   button { -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:${C.bg};} ::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}
-  @media(max-width:767px){
-    .desktop-only{display:none!important;}
-    .sidebar{display:none!important;}
-    .main-content{padding:12px!important;}
-    .book-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important;gap:10px!important;}
-    .filter-row{flex-direction:column!important;}
-    .topbar{padding:10px 14px!important;}
-    .topbar h2{font-size:15px!important;}
-    .form-grid{grid-template-columns:1fr!important;}
-    .detail-meta{grid-template-columns:1fr!important;}
-  }
-  @media(min-width:768px){
-    .mobile-only{display:none!important;}
-    .bottom-nav{display:none!important;}
-  }
 `;
 
 const Btn = ({ children, onClick, disabled, variant="primary", style={}, small=false, full=false }) => {
@@ -72,20 +70,27 @@ const Btn = ({ children, onClick, disabled, variant="primary", style={}, small=f
   const v = { primary:{background:C.accent,color:"#fff"}, success:{background:C.success,color:"#fff"}, danger:{background:C.danger,color:"#fff"}, ghost:{background:"transparent",color:C.textSec,border:`1px solid ${C.border}`}, dark:{background:C.border,color:C.text} };
   return <button onClick={disabled?undefined:onClick} style={{...base,...v[variant]}} disabled={disabled}>{children}</button>;
 };
-
 const Card = ({ children, style={} }) => <div style={{ background:C.card, borderRadius:14, border:`1px solid ${C.border}`, padding:"1.2rem", ...style }}>{children}</div>;
 const Badge = ({ children, color=C.accent }) => <span style={{ background:color+"22", color, fontSize:11, padding:"3px 10px", borderRadius:20, fontWeight:600, border:`1px solid ${color}44`, whiteSpace:"nowrap" }}>{children}</span>;
 const Stars = ({ value=0, size=16, onChange }) => <span>{[1,2,3,4,5].map(n=><span key={n} onClick={()=>onChange&&onChange(n)} style={{ fontSize:size, cursor:onChange?"pointer":"default", color:n<=value?C.gold:"#2a3352", padding:"0 1px" }}>★</span>)}</span>;
 
-async function callClaude(prompt, maxTokens=900) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:MODEL, max_tokens:maxTokens, messages:[{role:"user",content:prompt}] }) });
-  const data = await res.json();
-  return JSON.parse(data.content?.map(i=>i.text||"").join("").replace(/```json|```/g,"").trim());
+// ── NETLIFY FUNCTIONS ──────────────────────────────────────────────────────────
+async function searchByISBN(isbn) {
+  const r = await fetch("/.netlify/functions/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isbn: isbn.replace(/-/g,"") })
+  });
+  return r.json();
 }
-async function callClaudeImage(base64, prompt) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:MODEL, max_tokens:900, messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:base64}},{type:"text",text:prompt}]}]}) });
-  const data = await res.json();
-  return JSON.parse(data.content?.map(i=>i.text||"").join("").replace(/```json|```/g,"").trim());
+
+async function analyzeImage(base64) {
+  const r = await fetch("/.netlify/functions/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64 })
+  });
+  return r.json();
 }
 
 // ── SCANNER ────────────────────────────────────────────────────────────────────
@@ -111,15 +116,13 @@ function Scanner({ onResult, onClose }) {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const vCams = devices.filter(d => d.kind === "videoinput");
       setCameras(vCams);
-      // Siempre intentar cámara trasera primero
-      const constraints = vCams.length > 0 && idx > 0
-        ? { video: { deviceId: { exact: vCams[idx % vCams.length]?.deviceId } } }
-        : { video: { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const deviceId = vCams[idx % vCams.length]?.deviceId;
+        stream = await navigator.mediaDevices.getUserMedia(
+          deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { exact: "environment" } } }
+        );
       } catch(_) {
-        // Si exact environment falla, intentar sin exact
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       }
       streamRef.current = stream;
@@ -148,9 +151,7 @@ function Scanner({ onResult, onClose }) {
     const v = videoRef.current, c = canvasRef.current;
     c.width = v.videoWidth; c.height = v.videoHeight;
     c.getContext("2d").drawImage(v, 0, 0);
-    const dataUrl = c.toDataURL("image/jpeg", 0.9);
-    stop();
-    onResult({ type:"image", value:dataUrl });
+    stop(); onResult({ type:"image", value: c.toDataURL("image/jpeg", 0.9) });
   };
 
   useEffect(() => { startCamera(0); return stop; }, []);
@@ -180,7 +181,8 @@ const emptyForm = () => ({
   title:"", author:"", year:"", publisher:"", isbn:"", genre:"Novela", dewey:"800 - Literatura",
   language:"Español", age:"Adulto", situation:"Ocio y entretenimiento", status:"Disponible",
   cover:"", review:"", translator:"", edition:"", rating:0,
-  editorial:{ originalTitle:"", firstYear:"", firstPlace:"", format:"", originalPublisher:"", originalLanguage:"", notableTranslations:"", details:"", sources:[] }
+  editorial:{ originalTitle:"", firstYear:"", firstPlace:"", format:"", originalPublisher:"",
+    originalLanguage:"", notableTranslations:"", details:"", sources:[] }
 });
 
 function BookForm({ initial, onSave, onCancel, onScan }) {
@@ -197,17 +199,14 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
   const setEd = (k,v) => setForm(f=>({...f,editorial:{...f.editorial,[k]:v}}));
   const toBase64 = f => new Promise((res,rej) => { const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(f); });
 
+  // ── ANALIZAR IMAGEN ──────────────────────────────────────────────────────────
   const processImage = async (dataUrl) => {
-    const processImage = async (dataUrl) => {
-    setBusy("Analizando imagen con IA..."); setPreviewImage(dataUrl); setUseAsCover(false);
+    setBusy("Analizando imagen con IA...");
+    setPreviewImage(dataUrl);
+    setUseAsCover(false);
     try {
       const base64 = dataUrl.split(",")[1];
-      const r = await fetch("/.netlify/functions/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 })
-      });
-      const parsed = await r.json();
+      const parsed = await analyzeImage(base64);
       if (!parsed?.found) { setPreviewImage(null); setBusy(""); return; }
       setUseAsCover(parsed.isCover === true);
       setForm(f => {
@@ -228,19 +227,12 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
     setBusy("");
   };
 
+  // ── BUSCAR POR ISBN ──────────────────────────────────────────────────────────
   const fetchByISBN = async (isbn, updateIsbn=true) => {
-    setBusy("Buscando datos por ISBN..."); 
-    const clean = isbn.replace(/-/g,"");
+    setBusy("Buscando datos por ISBN...");
     let found = false;
-
-    // 1) Netlify Function → Google Books (mejor cobertura libros españoles)
     try {
-      const r = await fetch("/.netlify/functions/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isbn: clean })
-      });
-      const d = await r.json();
+      const d = await searchByISBN(isbn);
       if (d.found && d.title) {
         setForm(f => ({...f,
           title: d.title || f.title,
@@ -256,9 +248,9 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       }
     } catch(_) {}
 
-    // 2) Open Library como respaldo
     if (!found) {
       try {
+        const clean = isbn.replace(/-/g,"");
         const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
         const d = await r.json();
         const b = d[`ISBN:${clean}`];
@@ -277,61 +269,74 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
 
     if (updateIsbn && !found) {
       setForm(f => ({...f, isbn}));
-      alert("No se encontró el libro con ese ISBN. Por favor rellena los datos manualmente.");
+      alert("No se encontró el libro. Rellena los datos manualmente.");
     }
-
-    // Buscar historia editorial si tenemos título y autor
-    setForm(f => {
-      if (f.title && f.author) fetchEditorial(f.title, f.author);
-      return f;
-    });
+    setForm(f => { if(f.title && f.author) fetchEditorial(f.title, f.author); return f; });
     setBusy("");
   };
 
+  // ── HISTORIA EDITORIAL ───────────────────────────────────────────────────────
   const fetchEditorial = async (title, author) => {
     setBusy("Buscando historia editorial...");
-    try { const ed=await callClaude(`Información bibliográfica de primera edición de "${title}" de "${author}". SOLO JSON sin backticks: {"originalTitle":"","firstYear":0,"firstPlace":"","format":"","originalPublisher":"","originalLanguage":"","notableTranslations":"","details":"2-3 frases","sources":["fuente"]}`);
-      if (ed) setForm(f=>({...f,editorial:{...f.editorial,...ed}}));
+    try {
+      const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=1`);
+      const d = await r.json();
+      const b = d.docs?.[0];
+      if (b) {
+        setForm(f => ({...f, editorial: {...f.editorial,
+          originalTitle: b.title || f.editorial.originalTitle,
+          firstYear: b.first_publish_year || f.editorial.firstYear,
+          originalLanguage: b.language?.[0] || f.editorial.originalLanguage,
+          originalPublisher: b.publisher?.[0] || f.editorial.originalPublisher,
+        }}));
+      }
     } catch(_) {}
     setBusy("");
   };
 
+  // ── GUARDAR ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.title||!form.author) { alert("Título y autor son obligatorios"); return; }
-    setBusy("Verificando y corrigiendo...");
-    try { const c=await callClaude(`Bibliotecario experto. Corrige: Título:"${form.title}" Autor:"${form.author}" Traductor:"${form.translator}" Editorial:"${form.publisher}" Año:"${form.year}" Idioma:"${form.language}" Género:"${form.genre}". Reglas: título completo oficial, mayúsculas correctas, acentos y diacríticos, coautores con "&", no inventes. SOLO JSON: {"title":"","author":"","translator":"","publisher":"","year":0,"language":"","genre":"","corrections":[]}`);
-      if (c) { const final={...form,...c}; delete final.corrections; setCorrections(c.corrections||[]); setBusy(""); onSave(final); return; }
-    } catch(_) {}
-    setBusy(""); onSave(form);
+    if (!form.title || !form.author) { alert("Título y autor son obligatorios"); return; }
+    setBusy("Guardando...");
+    onSave(form);
   };
 
-  const handleFile = async (file) => { if (!file?.type.startsWith("image/")) return; const d=await toBase64(file); processImage(d); };
+  const handleFile = async (file) => {
+    if (!file?.type.startsWith("image/")) return;
+    const d = await toBase64(file);
+    processImage(d);
+  };
 
-  const fld = (label,key,type="text",ph="") => <div><label>{label}</label><input type={type} value={form[key]||""} onChange={e=>set(key,e.target.value)} placeholder={ph}/></div>;
-  const sel = (label,key,opts) => <div><label>{label}</label><select value={form[key]||""} onChange={e=>set(key,e.target.value)}>{opts.map(o=><option key={o}>{o}</option>)}</select></div>;
-
-  const tabs = ["basic","editorial","cover"];
-  const tabLabels = { basic:"📋 Datos", editorial:"📖 Historia", cover:"🖼 Portada" };
+  const fld = (label,key,type="text",ph="") => (
+    <div><label>{label}</label><input type={type} value={form[key]||""} onChange={e=>set(key,e.target.value)} placeholder={ph}/></div>
+  );
+  const sel = (label,key,opts) => (
+    <div><label>{label}</label><select value={form[key]||""} onChange={e=>set(key,e.target.value)}>{opts.map(o=><option key={o}>{o}</option>)}</select></div>
+  );
 
   return (
     <div style={{ color:C.text }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-        <h2 style={{ margin:0, fontSize:17 }}>{initial?.id?"Editar":"Añadir libro"}</h2>
+        <h2 style={{ margin:0, fontSize:17 }}>{initial?.id ? "Editar" : "Añadir libro"}</h2>
         <Btn onClick={onScan} variant="dark" small>📷 Cámara</Btn>
       </div>
 
       {/* Tabs */}
       <div style={{ display:"flex", gap:6, marginBottom:16, background:C.inputBg, borderRadius:10, padding:4 }}>
-        {tabs.map(t=><button key={t} onClick={()=>setTab(t)} style={{ flex:1, border:"none", borderRadius:8, padding:"8px 4px", fontSize:12, fontWeight:600, cursor:"pointer", background:tab===t?C.accent:"transparent", color:tab===t?"#fff":C.textSec, transition:"all 0.2s" }}>{tabLabels[t]}</button>)}
+        {["basic","editorial","cover"].map(t => (
+          <button key={t} onClick={()=>setTab(t)} style={{ flex:1, border:"none", borderRadius:8, padding:"8px 4px", fontSize:12, fontWeight:600, cursor:"pointer", background:tab===t?C.accent:"transparent", color:tab===t?"#fff":C.textSec, transition:"all 0.2s" }}>
+            {t==="basic"?"📋 Datos":t==="editorial"?"📖 Historia":"🖼 Portada"}
+          </button>
+        ))}
       </div>
 
       {busy && <div style={{ background:C.info+"22", color:C.info, border:`1px solid ${C.info}44`, borderRadius:8, padding:"10px 14px", marginBottom:12, fontSize:13 }}>⏳ {busy}</div>}
-      {corrections.length>0 && <div style={{ background:C.success+"18", color:C.success, border:`1px solid ${C.success}44`, borderRadius:8, padding:"10px 14px", marginBottom:12, fontSize:13 }}>
+      {corrections.length > 0 && <div style={{ background:C.success+"18", color:C.success, border:`1px solid ${C.success}44`, borderRadius:8, padding:"10px 14px", marginBottom:12, fontSize:13 }}>
         <strong>✅ Correcciones:</strong><ul style={{ margin:"5px 0 0", paddingLeft:18 }}>{corrections.map((c,i)=><li key={i}>{c}</li>)}</ul>
       </div>}
 
-      {/* Tab: Datos básicos */}
-      {tab==="basic" && <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      {/* Tab Datos */}
+      {tab === "basic" && <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         <div><label>Título *</label><input value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Título del libro"/></div>
         <div><label>Autor(es) *</label><input value={form.author} onChange={e=>set("author",e.target.value)} placeholder="Nombre del autor"/></div>
         {fld("Traductor","translator","text","Si es traducción")}
@@ -353,14 +358,14 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
         <div><label>Tu valoración</label>
           <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:10 }}>
             <Stars value={form.rating||0} size={32} onChange={n=>set("rating",n)}/>
-            {form.rating>0 && <span onClick={()=>set("rating",0)} style={{ fontSize:12, color:C.textSec, cursor:"pointer" }}>Quitar</span>}
+            {form.rating > 0 && <span onClick={()=>set("rating",0)} style={{ fontSize:12, color:C.textSec, cursor:"pointer" }}>Quitar</span>}
           </div>
         </div>
         <div><label>Tu reseña personal</label><textarea value={form.review} onChange={e=>set("review",e.target.value)} rows={3} style={{ resize:"vertical" }}/></div>
       </div>}
 
-      {/* Tab: Historia editorial */}
-      {tab==="editorial" && <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      {/* Tab Historia */}
+      {tab === "editorial" && <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         <Btn onClick={()=>fetchEditorial(form.title,form.author)} disabled={!form.title||!form.author||!!busy} full variant="dark">
           {busy==="Buscando historia editorial..."?"Buscando...":"🔍 Buscar automáticamente"}
         </Btn>
@@ -371,8 +376,8 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
         <div><label>Fuentes (separadas por coma)</label><input value={Array.isArray(form.editorial.sources)?form.editorial.sources.join(", "):form.editorial.sources||""} onChange={e=>setEd("sources",e.target.value.split(",").map(s=>s.trim()).filter(Boolean))}/></div>
       </div>}
 
-      {/* Tab: Portada */}
-      {tab==="cover" && <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      {/* Tab Portada */}
+      {tab === "cover" && <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)}
           onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0]);}}
           onClick={()=>fileRef.current.click()}
@@ -387,8 +392,8 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
           <div style={{ background:C.inputBg, borderRadius:10, padding:14, border:`1px solid ${C.border}` }}>
             <img src={previewImage} alt="preview" style={{ width:"100%", maxHeight:200, objectFit:"contain", borderRadius:8, marginBottom:10 }}/>
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-              <input type="checkbox" id="usecover" checked={useAsCover} onChange={e=>setUseAsCover(e.target.checked)} style={{ width:"auto", accentColor:C.accent, width:20, height:20 }}/>
-              <label htmlFor="usecover" style={{ fontSize:14, color:C.text, cursor:"pointer", margin:0 }}>Usar como portada del libro</label>
+              <input type="checkbox" checked={useAsCover} onChange={e=>setUseAsCover(e.target.checked)} style={{ width:20, height:20, accentColor:C.accent }}/>
+              <span style={{ fontSize:14, color:C.text, cursor:"pointer" }} onClick={()=>setUseAsCover(v=>!v)}>Usar como portada del libro</span>
             </div>
             {useAsCover && <Btn onClick={()=>{set("cover",previewImage);setPreviewImage(null);}} full>✔ Confirmar portada</Btn>}
           </div>
@@ -403,7 +408,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       </div>}
 
       <div style={{ display:"flex", gap:10, marginTop:20 }}>
-        <Btn onClick={handleSave} disabled={!!busy} style={{ flex:1 }}>{busy==="Verificando y corrigiendo..."?"Verificando...":"✔ Guardar"}</Btn>
+        <Btn onClick={handleSave} disabled={!!busy} style={{ flex:1 }}>✔ Guardar</Btn>
         <Btn onClick={onCancel} variant="ghost" style={{ flex:1 }}>Cancelar</Btn>
       </div>
     </div>
@@ -428,7 +433,6 @@ function BookDetail({ book, onClose, onEdit, onDelete, canEdit, canDelete, canRa
 
   return (
     <div style={{ color:C.text }}>
-      {/* Portada y datos principales */}
       <div style={{ display:"flex", gap:16, marginBottom:18 }}>
         {book.cover
           ? <img src={book.cover} alt="portada" style={{ width:90, height:130, objectFit:"cover", borderRadius:8, flexShrink:0, border:`1px solid ${C.border}` }}/>
@@ -456,7 +460,7 @@ function BookDetail({ book, onClose, onEdit, onDelete, canEdit, canDelete, canRa
       </div>}
 
       {book.editorial?.firstYear && <div style={{ background:C.inputBg, borderRadius:10, padding:"12px 14px", marginBottom:14, border:`1px solid ${C.border}` }}>
-        <div style={{ fontSize:11, fontWeight:600, color:C.accent, marginBottom:10 }}>HISTORIA EDITORIAL — PRIMERA EDICIÓN</div>
+        <div style={{ fontSize:11, fontWeight:600, color:C.accent, marginBottom:10 }}>HISTORIA EDITORIAL</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 16px", fontSize:12 }}>
           {[["Título original","originalTitle"],["Primera pub.","firstYear"],["Lugar","firstPlace"],["Formato","format"],["Editorial orig.","originalPublisher"],["Idioma orig.","originalLanguage"],["Traducciones","notableTranslations"]].map(([lb,key])=>
             book.editorial[key]?[<span key={lb} style={{ color:C.textSec }}>{lb}</span>,<span key={key}>{book.editorial[key]}</span>]:null
@@ -511,10 +515,7 @@ function UserMgmt({ users, setUsers, currentUser }) {
       <h2 style={{ fontSize:18, fontWeight:700, marginBottom:16 }}>Usuarios</h2>
       {users.map(u=><div key={u.id} style={{ padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-          <div>
-            <span style={{ fontWeight:600 }}>{u.name}</span>
-            {!u.active && <Badge color={C.danger} style={{ marginLeft:8 }}>Inactivo</Badge>}
-          </div>
+          <div><span style={{ fontWeight:600 }}>{u.name}</span>{!u.active && <Badge color={C.danger} style={{ marginLeft:8 }}>Inactivo</Badge>}</div>
           {u.id!==currentUser.id && <Btn onClick={()=>db.update("users",u.id,{active:!u.active}).then(()=>setUsers(us=>us.map(x=>x.id===u.id?{...x,active:!x.active}:x)))} variant={u.active?"danger":"success"} small>{u.active?"Desactivar":"Activar"}</Btn>}
         </div>
         <div style={{ fontSize:12, color:C.textSec, marginBottom:6 }}>{u.email}</div>
@@ -556,7 +557,8 @@ function App() {
 
   const notify = (msg) => { setToast(msg); setTimeout(()=>setToast(""),3000); };
   const can = (a) => {
-    if (!currentUser) return false; const r=currentUser.role;
+    if (!currentUser) return false;
+    const r = currentUser.role;
     if (a==="add"||a==="edit") return r==="admin"||r==="editor";
     if (a==="delete"||a==="manageUsers") return r==="admin";
     if (a==="rate") return ["admin","editor","user"].includes(r);
@@ -566,8 +568,11 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [bks,usrs] = await Promise.all([db.get("books"), db.get("users")]);
-        setBooks(bks.map(b=>({...b, editorial:typeof b.editorial==="string"?JSON.parse(b.editorial||"{}"):b.editorial||{}, ratings:typeof b.ratings==="string"?JSON.parse(b.ratings||"[]"):b.ratings||[]})));
+        const [bks, usrs] = await Promise.all([db.get("books"), db.get("users")]);
+        setBooks(bks.map(b=>({...b,
+          editorial: typeof b.editorial==="string" ? JSON.parse(b.editorial||"{}") : b.editorial||{},
+          ratings: typeof b.ratings==="string" ? JSON.parse(b.ratings||"[]") : b.ratings||[]
+        })));
         setUsers(usrs);
       } catch(e) { console.error(e); }
       setLoading(false);
@@ -592,11 +597,76 @@ function App() {
     return 0;
   });
 
-  const stats = { total:books.length, available:books.filter(b=>b.status==="Disponible").length, reading:books.filter(b=>b.status==="En lectura").length, loaned:books.filter(b=>b.status==="Prestado").length };
+  const stats = {
+    total: books.length,
+    available: books.filter(b=>b.status==="Disponible").length,
+    reading: books.filter(b=>b.status==="En lectura").length,
+    loaned: books.filter(b=>b.status==="Prestado").length
+  };
 
-  // Panel helper
+  const openForm = (book=null) => {
+    setEditBook(book);
+    setFormKey(k=>k+1);
+    setShowForm(true);
+    setShowScanner(false);
+  };
+
+  const openScanner = () => {
+    setEditBook(null);
+    setFormKey(k=>k+1);
+    setShowScanner(true);
+    setShowForm(false);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setShowScanner(false);
+    setEditBook(null);
+    setFormKey(k=>k+1);
+  };
+
+  const saveBook = async (form) => {
+    const clean = {...form};
+    delete clean._scan;
+    const payload = {
+      title: clean.title,
+      author: clean.author,
+      translator: clean.translator || null,
+      edition: clean.edition || null,
+      year: clean.year && clean.year !== "" ? String(clean.year) : null,
+      publisher: clean.publisher || null,
+      isbn: clean.isbn || null,
+      language: clean.language || null,
+      genre: clean.genre || null,
+      dewey: clean.dewey || null,
+      age: clean.age || null,
+      situation: clean.situation || null,
+      status: clean.status || "Disponible",
+      cover: clean.cover || null,
+      rating: clean.rating ? parseInt(clean.rating) : 0,
+      review: clean.review || null,
+      editorial: JSON.stringify(clean.editorial || {}),
+      ratings: JSON.stringify(clean.ratings || []),
+    };
+    try {
+      if (editBook?.id) {
+        await db.update("books", editBook.id, payload);
+        setBooks(bs=>bs.map(b=>b.id===editBook.id?{...b,...clean}:b));
+        notify("Libro actualizado");
+      } else {
+        const res = await db.insert("books", {...payload, added_by: currentUser.id});
+        if (res?.error) { alert("Error al guardar: " + res.error.message); return; }
+        if (res[0]) setBooks(bs=>[...bs,{...res[0], editorial:clean.editorial, ratings:clean.ratings||[]}]);
+        notify("Libro añadido");
+      }
+      closeForm();
+    } catch(e) { alert("Error al guardar: " + e.message); }
+  };
+
+  // Panel deslizante desde abajo
   const Panel = ({ show, children }) => show ? (
-    <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.7)", display:"flex", alignItems:"flex-end" }} onClick={e=>e.target===e.currentTarget&&(setShowForm(false),setShowScanner(false),setSelectedBook(null))}>
+    <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.7)", display:"flex", alignItems:"flex-end" }}
+      onClick={e=>e.target===e.currentTarget&&closeForm()}>
       <div style={{ background:C.card, borderRadius:"16px 16px 0 0", width:"100%", maxHeight:"92vh", overflowY:"auto", padding:"20px 16px 32px" }}>
         <div style={{ width:40, height:4, background:C.border, borderRadius:2, margin:"0 auto 16px" }}/>
         {children}
@@ -604,7 +674,7 @@ function App() {
     </div>
   ) : null;
 
-  // LOGIN ──────────────────────────────────────────────────────────────────────
+  // LOGIN
   if (!currentUser) return (
     <div style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
       <style>{css}</style>
@@ -627,15 +697,14 @@ function App() {
     </div>
   );
 
-  // MAIN ───────────────────────────────────────────────────────────────────────
+  // MAIN
   return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, paddingBottom:70 }}>
       <style>{css}</style>
 
-      {/* Toast */}
       {toast && <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", zIndex:999, background:C.success, color:"#fff", padding:"10px 20px", borderRadius:30, fontWeight:600, fontSize:14, boxShadow:"0 4px 20px rgba(0,0,0,0.3)", whiteSpace:"nowrap" }}>✅ {toast}</div>}
 
-      {/* Top bar */}
+      {/* Topbar */}
       <div style={{ background:C.sidebar, borderBottom:`1px solid ${C.border}`, padding:"14px 16px", position:"sticky", top:0, zIndex:100 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: activeSection==="catalog"?10:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -649,8 +718,8 @@ function App() {
           </div>
           {can("add") && activeSection==="catalog" && (
             <div style={{ display:"flex", gap:8 }}>
-              <Btn onClick={()=>{ setEditBook(null); setFormKey(k=>k+1); setShowScanner(true); setShowForm(false); }} variant="dark" small>📷</Btn>
-              <Btn onClick={()=>{ setEditBook(null); setFormKey(k=>k+1); setShowForm(true); setShowScanner(false); }} small>+ Añadir</Btn>
+              <Btn onClick={openScanner} variant="dark" small>📷</Btn>
+              <Btn onClick={()=>openForm()} small>+ Añadir</Btn>
             </div>
           )}
         </div>
@@ -658,20 +727,29 @@ function App() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar título, autor, tema..." style={{ marginBottom:8 }}/>
           <div style={{ display:"flex", gap:8 }}>
             <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ flex:1, fontSize:13 }}>
-              <option value="title">Título</option><option value="author">Autor</option><option value="year">Año</option><option value="rating">Valoración</option>
+              <option value="title">Título</option>
+              <option value="author">Autor</option>
+              <option value="year">Año</option>
+              <option value="rating">Valoración</option>
             </select>
             <Btn onClick={()=>setShowFilters(v=>!v)} variant={Object.values(filters).some(Boolean)?"primary":"dark"} small>⚙️ Filtros</Btn>
           </div>
           {showFilters && <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
-            <select value={filters.genre} onChange={e=>setFilters(f=>({...f,genre:e.target.value}))} style={{ flex:1, fontSize:12 }}><option value="">Género: todos</option>{GENRES.map(o=><option key={o}>{o}</option>)}</select>
-            <select value={filters.age} onChange={e=>setFilters(f=>({...f,age:e.target.value}))} style={{ flex:1, fontSize:12 }}><option value="">Edad: todas</option>{AGES.map(o=><option key={o}>{o}</option>)}</select>
-            <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))} style={{ flex:1, fontSize:12 }}><option value="">Estado: todos</option>{STATUSES.map(o=><option key={o}>{o}</option>)}</select>
+            <select value={filters.genre} onChange={e=>setFilters(f=>({...f,genre:e.target.value}))} style={{ flex:1, fontSize:12 }}>
+              <option value="">Género: todos</option>{GENRES.map(o=><option key={o}>{o}</option>)}
+            </select>
+            <select value={filters.age} onChange={e=>setFilters(f=>({...f,age:e.target.value}))} style={{ flex:1, fontSize:12 }}>
+              <option value="">Edad: todas</option>{AGES.map(o=><option key={o}>{o}</option>)}
+            </select>
+            <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))} style={{ flex:1, fontSize:12 }}>
+              <option value="">Estado: todos</option>{STATUSES.map(o=><option key={o}>{o}</option>)}
+            </select>
             {Object.values(filters).some(Boolean) && <Btn onClick={()=>setFilters({genre:"",age:"",status:""})} variant="ghost" small>✕</Btn>}
           </div>}
         </>}
       </div>
 
-      {/* Content */}
+      {/* Contenido */}
       <div style={{ padding:"16px 14px" }}>
 
         {/* CATÁLOGO */}
@@ -683,7 +761,7 @@ function App() {
               const sCol = { "Disponible":C.success, "Prestado":C.warning, "En lectura":C.info, "Deteriorado":C.danger };
               return (
                 <div key={book.id} onClick={()=>setSelectedBook(book)}
-                  style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:12, cursor:"pointer", transition:"all 0.18s" }}>
+                  style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:12, cursor:"pointer" }}>
                   {book.cover
                     ? <img src={book.cover} alt="" style={{ width:"100%", height:110, objectFit:"cover", borderRadius:8, marginBottom:8 }}/>
                     : <div style={{ width:"100%", height:80, background:C.inputBg, borderRadius:8, marginBottom:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>📖</div>}
@@ -703,7 +781,7 @@ function App() {
           {filtered.length===0 && <div style={{ textAlign:"center", padding:"4rem 1rem", color:C.textSec }}>
             <div style={{ fontSize:48, marginBottom:12 }}>🔍</div>
             <p>No se encontraron ejemplares.</p>
-            {can("add") && <Btn onClick={()=>{setEditBook(null);setShowForm(true);}}>Añadir el primero</Btn>}
+            {can("add") && <Btn onClick={()=>openForm()}>Añadir el primero</Btn>}
           </div>}
         </>}
 
@@ -733,7 +811,7 @@ function App() {
         {activeSection==="users" && <Card><UserMgmt users={users} setUsers={setUsers} currentUser={currentUser}/></Card>}
       </div>
 
-      {/* Bottom navigation */}
+      {/* Navegación inferior */}
       <div style={{ position:"fixed", bottom:0, left:0, right:0, background:C.sidebar, borderTop:`1px solid ${C.border}`, display:"flex", zIndex:100 }}>
         {[
           { id:"catalog", icon:"📚", label:"Catálogo" },
@@ -748,45 +826,28 @@ function App() {
         ))}
       </div>
 
-      {/* Panels (modal bottom sheet) */}
+      {/* Panels */}
       <Panel show={showScanner}>
-        <Scanner onResult={r=>{setShowScanner(false);setEditBook({_scan:r});setShowForm(true);}} onClose={()=>setShowScanner(false)}/>
+        <Scanner
+          onResult={r=>{ setShowScanner(false); setEditBook({_scan:r}); setShowForm(true); }}
+          onClose={closeForm}/>
       </Panel>
 
       <Panel show={showForm}>
         {showForm && <BookForm
           key={formKey}
           initial={editBook}
-          onScan={()=>{setShowForm(false);setShowScanner(true);}}
-          onSave={async form=>{
-            const clean={...form}; delete clean._scan;
-            const payload={...clean, editorial:JSON.stringify(clean.editorial||{}), ratings:JSON.stringify(clean.ratings||[])};
-            try {
-              if (editBook?.id) {
-                const res = await db.update("books", editBook.id, payload);
-                console.log("UPDATE result:", JSON.stringify(res));
-                setBooks(bs=>bs.map(b=>b.id===editBook.id?{...b,...clean}:b));
-                notify("Libro actualizado");
-              } else {
-                console.log("INSERT payload:", JSON.stringify(payload));
-                const res = await db.insert("books", {...payload, added_by:currentUser.id});
-                console.log("INSERT result:", JSON.stringify(res));
-                if (res?.error) { alert("Error Supabase: " + JSON.stringify(res.error)); return; }
-                if (res[0]) setBooks(bs=>[...bs,{...res[0], editorial:clean.editorial, ratings:clean.ratings||[]}]);
-                notify("Libro añadido");
-              }
-            } catch(e) { alert("Error al guardar: "+e.message); console.error(e); }
-            setShowForm(false);
-            setEditBook(null);
-            setFormKey(k=>k+1);
-          }}
-          onCancel={()=>{ setShowForm(false); setEditBook(null); setFormKey(k=>k+1); }}/> }
+          onScan={()=>{ setShowForm(false); setShowScanner(true); }}
+          onSave={saveBook}
+          onCancel={closeForm}/>}
       </Panel>
 
       <Panel show={!!selectedBook}>
-        {selectedBook && <BookDetail book={selectedBook} onClose={()=>setSelectedBook(null)}
-          onEdit={()=>{setEditBook(selectedBook);setShowForm(true);setSelectedBook(null);}}
-          onDelete={async()=>{await db.delete("books",selectedBook.id);setBooks(bs=>bs.filter(b=>b.id!==selectedBook.id));setSelectedBook(null);notify("Libro eliminado");}}
+        {selectedBook && <BookDetail
+          book={selectedBook}
+          onClose={()=>setSelectedBook(null)}
+          onEdit={()=>{ openForm(selectedBook); setSelectedBook(null); }}
+          onDelete={async()=>{ await db.delete("books",selectedBook.id); setBooks(bs=>bs.filter(b=>b.id!==selectedBook.id)); setSelectedBook(null); notify("Libro eliminado"); }}
           canEdit={can("edit")} canDelete={can("delete")} canRate={can("rate")}
           currentUser={currentUser} setBooks={setBooks}/>}
       </Panel>
