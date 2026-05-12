@@ -205,8 +205,22 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
     setPreviewImage(dataUrl);
     setUseAsCover(false);
     try {
-      const base64 = dataUrl.split(",")[1];
-      const parsed = await analyzeImage(base64);
+      // Reducir tamaño de imagen antes de enviar (máx 1MB)
+      const compressed = await compressImage(dataUrl, 800, 0.7);
+      const base64 = compressed.split(",")[1];
+      const r = await fetch("/.netlify/functions/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 })
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        console.error("Function error:", err);
+        setBusy("");
+        return;
+      }
+      const parsed = await r.json();
+      console.log("Image analysis result:", parsed);
       if (!parsed?.found) { setPreviewImage(null); setBusy(""); return; }
       setUseAsCover(parsed.isCover === true);
       setForm(f => {
@@ -226,6 +240,19 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
     } catch(e) { console.error("Error analizando imagen:", e); }
     setBusy("");
   };
+
+  const compressImage = (dataUrl, maxWidth, quality) => new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      res(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = dataUrl;
+  });
 
   // ── BUSCAR POR ISBN ──────────────────────────────────────────────────────────
   const fetchByISBN = async (isbn, updateIsbn=true) => {
