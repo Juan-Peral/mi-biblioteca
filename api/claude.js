@@ -47,7 +47,7 @@ Si no es imagen de un libro: {"found":false}`;
 
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
