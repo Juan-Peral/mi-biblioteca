@@ -7,9 +7,12 @@ exports.handler = async (event) => {
 
   let body;
   try {
+    if (!event.body || event.body.trim() === "") {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: "Empty body" }) };
+    }
     body = JSON.parse(event.body);
   } catch(e) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON" }) };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid JSON: " + e.message }) };
   }
 
   // ── BÚSQUEDA POR ISBN ──────────────────────────────────────────────────────
