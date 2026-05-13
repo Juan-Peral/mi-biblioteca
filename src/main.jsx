@@ -208,7 +208,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       // Reducir tamaño de imagen antes de enviar (máx 1MB)
       const compressed = await compressImage(dataUrl, 800, 0.7);
       const base64 = compressed.split(",")[1];
-      const r = await fetch("/.netlify/functions/claude", {
+      const r = await fetch("/./api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
