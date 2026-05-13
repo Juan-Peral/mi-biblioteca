@@ -36,25 +36,27 @@ export default async function handler(req, res) {
 
   // ── BÚSQUEDA POR TÍTULO Y AUTOR → ISBN ────────────────────────────────────
   if (body.title && body.author) {
+    const title = body.title;
+    const author = body.author;
+
+    // 1) Google Books
     const searches = [
-      `intitle:${body.title} inauthor:${body.author}`,
-      `${body.title} ${body.author}`,
-      `intitle:${body.title}`,
+      `intitle:${title} inauthor:${author}`,
+      `${title} ${author}`,
+      `intitle:${title}`,
     ];
     for (const q of searches) {
       try {
         const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=3`);
         const d = await r.json();
         if (d.items?.length > 0) {
-          // Buscar el resultado que mejor coincida
           for (const item of d.items) {
             const b = item.volumeInfo;
             const isbn = b.industryIdentifiers?.find(i => i.type === "ISBN_13")?.identifier ||
                          b.industryIdentifiers?.find(i => i.type === "ISBN_10")?.identifier || "";
             if (isbn) {
               return res.status(200).json({
-                found: true,
-                isbn,
+                found: true, isbn,
                 year: b.publishedDate ? parseInt(b.publishedDate) : null,
                 publisher: b.publisher || "",
                 language: b.language || "",
@@ -66,6 +68,24 @@ export default async function handler(req, res) {
         }
       } catch(e) {}
     }
+
+    // 2) Open Library como respaldo
+    try {
+      const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=3`);
+      const d = await r.json();
+      for (const doc of (d.docs || [])) {
+        const isbn = doc.isbn?.[0] || "";
+        if (isbn) {
+          return res.status(200).json({
+            found: true, isbn,
+            year: doc.first_publish_year || null,
+            publisher: doc.publisher?.[0] || "",
+            language: doc.language?.[0] || "",
+          });
+        }
+      }
+    } catch(e) {}
+
     return res.status(200).json({ found: false });
   }
 
