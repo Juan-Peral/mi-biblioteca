@@ -36,28 +36,37 @@ export default async function handler(req, res) {
 
   // ── BÚSQUEDA POR TÍTULO Y AUTOR → ISBN ────────────────────────────────────
   if (body.title && body.author) {
-    try {
-      const q = encodeURIComponent(`intitle:${body.title} inauthor:${body.author}`);
-      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`);
-      const d = await r.json();
-      if (d.items?.length > 0) {
-        const b = d.items[0].volumeInfo;
-        const isbn = b.industryIdentifiers?.find(i => i.type === "ISBN_13")?.identifier ||
-                     b.industryIdentifiers?.find(i => i.type === "ISBN_10")?.identifier || "";
-        return res.status(200).json({
-          found: true,
-          isbn,
-          year: b.publishedDate ? parseInt(b.publishedDate) : null,
-          publisher: b.publisher || "",
-          language: b.language || "",
-          genre: b.categories ? b.categories[0] : "",
-          cover: b.imageLinks ? b.imageLinks.thumbnail.replace("http://","https://") : "",
-        });
-      }
-      return res.status(200).json({ found: false });
-    } catch(e) {
-      return res.status(200).json({ found: false, error: e.message });
+    const searches = [
+      `intitle:${body.title} inauthor:${body.author}`,
+      `${body.title} ${body.author}`,
+      `intitle:${body.title}`,
+    ];
+    for (const q of searches) {
+      try {
+        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=3`);
+        const d = await r.json();
+        if (d.items?.length > 0) {
+          // Buscar el resultado que mejor coincida
+          for (const item of d.items) {
+            const b = item.volumeInfo;
+            const isbn = b.industryIdentifiers?.find(i => i.type === "ISBN_13")?.identifier ||
+                         b.industryIdentifiers?.find(i => i.type === "ISBN_10")?.identifier || "";
+            if (isbn) {
+              return res.status(200).json({
+                found: true,
+                isbn,
+                year: b.publishedDate ? parseInt(b.publishedDate) : null,
+                publisher: b.publisher || "",
+                language: b.language || "",
+                genre: b.categories ? b.categories[0] : "",
+                cover: b.imageLinks ? b.imageLinks.thumbnail.replace("http://","https://") : "",
+              });
+            }
+          }
+        }
+      } catch(e) {}
     }
+    return res.status(200).json({ found: false });
   }
 
   if (body.image) {
