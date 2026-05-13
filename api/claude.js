@@ -38,6 +38,7 @@ export default async function handler(req, res) {
   if (body.title && body.author) {
     const title = body.title;
     const author = body.author;
+    console.log("Buscando ISBN para:", title, author);
 
     // 1) Google Books
     const searches = [
@@ -47,13 +48,17 @@ export default async function handler(req, res) {
     ];
     for (const q of searches) {
       try {
-        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=3`);
+        const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=3`;
+        console.log("Google Books query:", q);
+        const r = await fetch(url);
         const d = await r.json();
+        console.log("Google Books results:", d.items?.length || 0);
         if (d.items?.length > 0) {
           for (const item of d.items) {
             const b = item.volumeInfo;
             const isbn = b.industryIdentifiers?.find(i => i.type === "ISBN_13")?.identifier ||
                          b.industryIdentifiers?.find(i => i.type === "ISBN_10")?.identifier || "";
+            console.log("Found item:", b.title, "ISBN:", isbn);
             if (isbn) {
               return res.status(200).json({
                 found: true, isbn,
@@ -66,15 +71,18 @@ export default async function handler(req, res) {
             }
           }
         }
-      } catch(e) {}
+      } catch(e) { console.log("Google Books error:", e.message); }
     }
 
     // 2) Open Library como respaldo
     try {
+      console.log("Trying Open Library...");
       const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=3`);
       const d = await r.json();
+      console.log("Open Library results:", d.docs?.length || 0);
       for (const doc of (d.docs || [])) {
         const isbn = doc.isbn?.[0] || "";
+        console.log("OL item:", doc.title, "ISBN:", isbn);
         if (isbn) {
           return res.status(200).json({
             found: true, isbn,
@@ -84,8 +92,9 @@ export default async function handler(req, res) {
           });
         }
       }
-    } catch(e) {}
+    } catch(e) { console.log("Open Library error:", e.message); }
 
+    console.log("ISBN not found for:", title, author);
     return res.status(200).json({ found: false });
   }
 
