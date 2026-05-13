@@ -208,7 +208,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       // Reducir tamaño de imagen antes de enviar (máx 1MB)
       const compressed = await compressImage(dataUrl, 800, 0.7);
       const base64 = compressed.split(",")[1];
-      const r = await fetch("/./api/claude", {
+      const r = await fetch("/.netlify/functions/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
@@ -235,9 +235,10 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
         if (parsed.edition) m.edition = parsed.edition;
         return m;
       });
-      if (parsed.isbn) await fetchByISBN(parsed.isbn, false);
-      else if (parsed.title && parsed.author) {
-        // Buscar ISBN a partir de título y autor
+      if (parsed.isbn) {
+        await fetchByISBN(parsed.isbn, false);
+      } else if (parsed.title && parsed.author) {
+        console.log("Buscando ISBN por título+autor:", parsed.title, parsed.author);
         try {
           const r = await fetch("/api/claude", {
             method: "POST",
@@ -245,6 +246,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
             body: JSON.stringify({ title: parsed.title, author: parsed.author })
           });
           const d = await r.json();
+          console.log("Resultado búsqueda inversa:", d);
           if (d.found) {
             setForm(f => ({...f,
               isbn: d.isbn || f.isbn,
@@ -255,7 +257,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
               cover: f.cover || d.cover || "",
             }));
           }
-        } catch(_) {}
+        } catch(e) { console.error("Error búsqueda inversa:", e); }
         await fetchEditorial(parsed.title, parsed.author);
       }
     } catch(e) { console.error("Error analizando imagen:", e); }
