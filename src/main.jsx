@@ -726,10 +726,11 @@ function App() {
   };
 
   // Panel deslizante desde abajo
-  const Panel = ({ show, children }) => show ? (
+  const Panel = ({ show, children, preventClose=false }) => show ? (
     <div style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.7)", display:"flex", alignItems:"flex-end" }}
-      onClick={e=>e.target===e.currentTarget&&closeForm()}>
-      <div style={{ background:C.card, borderRadius:"16px 16px 0 0", width:"100%", maxHeight:"92vh", overflowY:"auto", padding:"20px 16px 32px" }}>
+      onClick={e=>{ if(preventClose) return; e.target===e.currentTarget&&closeForm(); }}>
+      <div style={{ background:C.card, borderRadius:"16px 16px 0 0", width:"100%", maxHeight:"92vh", overflowY:"auto", padding:"20px 16px 32px" }}
+        onClick={e=>e.stopPropagation()}>
         <div style={{ width:40, height:4, background:C.border, borderRadius:2, margin:"0 auto 16px" }}/>
         {children}
       </div>
@@ -889,7 +890,7 @@ function App() {
       </div>
 
       {/* Panels */}
-      <Panel show={showScanner}>
+      <Panel show={showScanner} preventClose>
         <Scanner
           onResult={r=>{ setShowScanner(false); setEditBook({_scan:r}); setShowForm(true); }}
           onClose={closeForm}/>
