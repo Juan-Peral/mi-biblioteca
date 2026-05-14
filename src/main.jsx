@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react"; 
+import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 
 // ── SUPABASE ───────────────────────────────────────────────────────────────────
@@ -102,74 +102,86 @@ function Scanner({ onResult, onClose }) {
   const rafRef = useRef(null);
   const [status, setStatus] = useState("Iniciando cámara...");
   const [ready, setReady] = useState(false);
-  const [cameras, setCameras] = useState([]);
-  const [camIdx, setCamIdx] = useState(0);
 
   const stop = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
   };
 
-  const startCamera = async (idx) => {
-    stop();
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const vCams = devices.filter(d => d.kind === "videoinput");
-      setCameras(vCams);
-      let stream;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
       try {
-        const deviceId = vCams[idx % vCams.length]?.deviceId;
-        stream = await navigator.mediaDevices.getUserMedia(
-          deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { exact: "environment" } } }
-        );
-      } catch(_) {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      }
-      streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-      setReady(true);
-      setStatus("Apunta al código de barras o captura la portada");
-      if ("BarcodeDetector" in window) {
-        detectorRef.current = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
-        const scan = async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) { rafRef.current = requestAnimationFrame(scan); return; }
-          try {
-            const codes = await detectorRef.current.detect(videoRef.current);
-            if (codes.length) { stop(); onResult({ type:"isbn", value:codes[0].rawValue }); return; }
-          } catch(_) {}
+        // Forzar siempre cámara trasera en móvil
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        setReady(true);
+        setStatus("Apunta al código de barras del libro");
+
+        // Iniciar detección automática si está disponible
+        if ("BarcodeDetector" in window) {
+          detectorRef.current = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
+          const scan = async () => {
+            if (cancelled || !videoRef.current || videoRef.current.readyState < 2) {
+              if (!cancelled) rafRef.current = requestAnimationFrame(scan);
+              return;
+            }
+            try {
+              const codes = await detectorRef.current.detect(videoRef.current);
+              if (codes.length) {
+                stop();
+                onResult({ type:"isbn", value: codes[0].rawValue });
+                return;
+              }
+            } catch(_) {}
+            if (!cancelled) rafRef.current = requestAnimationFrame(scan);
+          };
           rafRef.current = requestAnimationFrame(scan);
-        };
-        rafRef.current = requestAnimationFrame(scan);
+          setStatus("Detección automática activa — apunta al código de barras");
+        } else {
+          setStatus("Captura una foto del código de barras o la portada");
+        }
+      } catch(e) {
+        if (!cancelled) setStatus("No se pudo acceder a la cámara. Usa 'Subir foto' en su lugar.");
       }
-    } catch(e) {
-      setStatus("No se pudo acceder a la cámara. Usa 'Subir foto' en su lugar.");
-    }
-  };
+    })();
+    return () => { cancelled = true; stop(); };
+  }, []);
 
   const capture = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const v = videoRef.current, c = canvasRef.current;
     c.width = v.videoWidth; c.height = v.videoHeight;
     c.getContext("2d").drawImage(v, 0, 0);
-    stop(); onResult({ type:"image", value: c.toDataURL("image/jpeg", 0.9) });
+    stop();
+    onResult({ type:"image", value: c.toDataURL("image/jpeg", 0.9) });
   };
-
-  useEffect(() => { startCamera(0); return stop; }, []);
 
   return (
     <div style={{ textAlign:"center", color:C.text }}>
       <h3 style={{ margin:"0 0 8px", fontSize:17 }}>Escanear libro</h3>
       <p style={{ fontSize:13, color:C.textSec, marginBottom:12 }}>{status}</p>
       <div style={{ position:"relative", borderRadius:12, overflow:"hidden", background:"#000", marginBottom:12 }}>
-        <video ref={videoRef} autoPlay playsInline muted style={{ width:"100%", maxHeight:280, display:"block", objectFit:"cover" }} />
-        {ready && <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
-          <div style={{ position:"absolute", top:"20%", left:"10%", right:"10%", bottom:"20%", border:`2px solid ${C.success}`, borderRadius:8 }} />
-        </div>}
+        <video ref={videoRef} autoPlay playsInline muted style={{ width:"100%", maxHeight:320, display:"block", objectFit:"cover" }} />
+        {ready && (
+          <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
+            <div style={{ position:"absolute", top:"25%", left:"10%", right:"10%", bottom:"25%", border:`3px solid ${C.success}`, borderRadius:8, boxShadow:`0 0 0 9999px rgba(0,0,0,0.4)` }} />
+            <div style={{ position:"absolute", bottom:12, left:0, right:0, textAlign:"center", color:"#fff", fontSize:12 }}>
+              Mantén el código dentro del recuadro
+            </div>
+          </div>
+        )}
       </div>
       <canvas ref={canvasRef} style={{ display:"none" }} />
       <div style={{ display:"flex", gap:10, marginBottom:10 }}>
-        <Btn onClick={capture} style={{ flex:2 }} disabled={!ready}>📸 Capturar</Btn>
-        {cameras.length > 1 && <Btn onClick={() => { const n=(camIdx+1)%cameras.length; setCamIdx(n); startCamera(n); }} variant="dark" style={{ flex:1 }}>🔄</Btn>}
+        <Btn onClick={capture} style={{ flex:1 }} disabled={!ready}>📸 Capturar foto</Btn>
       </div>
       <Btn onClick={() => { stop(); onClose(); }} variant="ghost" full>Cancelar</Btn>
     </div>
@@ -208,7 +220,7 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       // Reducir tamaño de imagen antes de enviar (máx 1MB)
       const compressed = await compressImage(dataUrl, 800, 0.7);
       const base64 = compressed.split(",")[1];
-      const r = await fetch("/api/claude", {
+      const r = await fetch("/.netlify/functions/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
@@ -238,8 +250,28 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       if (parsed.isbn) {
         await fetchByISBN(parsed.isbn, false);
       } else if (parsed.title && parsed.author) {
-        if (parsed.isbn) await fetchByISBN(parsed.isbn, false);
-      else if (parsed.title && parsed.author) await fetchEditorial(parsed.title, parsed.author);
+        console.log("Buscando ISBN por título+autor:", parsed.title, parsed.author);
+        try {
+          const r = await fetch("/api/claude", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: parsed.title, author: parsed.author })
+          });
+          const d = await r.json();
+          console.log("Resultado búsqueda inversa:", d);
+          if (d.found) {
+            setForm(f => ({...f,
+              isbn: d.isbn || f.isbn,
+              year: d.year || f.year,
+              publisher: d.publisher || f.publisher,
+              language: d.language || f.language,
+              genre: d.genre || f.genre,
+              cover: f.cover || d.cover || "",
+            }));
+          }
+        } catch(e) { console.error("Error búsqueda inversa:", e); }
+        await fetchEditorial(parsed.title, parsed.author);
+      }
     } catch(e) { console.error("Error analizando imagen:", e); }
     setBusy("");
   };
