@@ -34,74 +34,11 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── BÚSQUEDA POR TÍTULO Y AUTOR → ISBN ────────────────────────────────────
-  if (body.title && body.author) {
-    const title = body.title;
-    const author = body.author;
-    console.log("Buscando ISBN para:", title, author);
+  // ── ANÁLISIS DE IMAGEN con Google Gemini ──────────────────────────────────
+  if (body.image) {
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_KEY) return res.status(500).json({ found: false, error: "GEMINI_API_KEY not set" });
 
-    // 1) Google Books
-    const searches = [
-      `intitle:${title} inauthor:${author}`,
-      `${title} ${author}`,
-      `intitle:${title}`,
-    ];
-    for (const q of searches) {
-      try {
-        const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=3`;
-        console.log("Google Books query:", q);
-        const r = await fetch(url);
-        const d = await r.json();
-        console.log("Google Books results:", d.items?.length || 0);
-        if (d.items?.length > 0) {
-          for (const item of d.items) {
-            const b = item.volumeInfo;
-            const isbn = b.industryIdentifiers?.find(i => i.type === "ISBN_13")?.identifier ||
-                         b.industryIdentifiers?.find(i => i.type === "ISBN_10")?.identifier || "";
-            console.log("Found item:", b.title, "ISBN:", isbn);
-            if (isbn) {
-              return res.status(200).json({
-                found: true, isbn,
-                year: b.publishedDate ? parseInt(b.publishedDate) : null,
-                publisher: b.publisher || "",
-                language: b.language || "",
-                genre: b.categories ? b.categories[0] : "",
-                cover: b.imageLinks ? b.imageLinks.thumbnail.replace("http://","https://") : "",
-              });
-            }
-          }
-        }
-      } catch(e) { console.log("Google Books error:", e.message); }
-    }
-
-    // 2) Open Library como respaldo
-    try {
-      console.log("Trying Open Library...");
-      const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=3`);
-      const d = await r.json();
-      console.log("Open Library results:", d.docs?.length || 0);
-      for (const doc of (d.docs || [])) {
-        const isbn = doc.isbn?.[0] || "";
-        console.log("OL item:", doc.title, "ISBN:", isbn);
-        if (isbn) {
-          return res.status(200).json({
-            found: true, isbn,
-            year: doc.first_publish_year || null,
-            publisher: doc.publisher?.[0] || "",
-            language: doc.language?.[0] || "",
-          });
-        }
-      }
-    } catch(e) { console.log("Open Library error:", e.message); }
-
-    console.log("ISBN not found for:", title, author);
-    return res.status(200).json({ 
-  found: false, 
-  debug: {
-    searched: [title, author],
-    message: "Not found in Google Books or Open Library"
-  }
-});
     const prompt = `Eres un experto bibliotecario. Analiza esta imagen de un libro (portada, lomo, contraportada o código de barras).
 Extrae toda la información visible: título completo con subtítulo, todos los autores, traductor, editorial, año, edición, ISBN (número de 13 dígitos bajo el código de barras).
 Si es la portada principal: isCover true.
