@@ -238,28 +238,8 @@ function BookForm({ initial, onSave, onCancel, onScan }) {
       if (parsed.isbn) {
         await fetchByISBN(parsed.isbn, false);
       } else if (parsed.title && parsed.author) {
-        console.log("Buscando ISBN por título+autor:", parsed.title, parsed.author);
-        try {
-          const r = await fetch("/api/claude", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: parsed.title, author: parsed.author })
-          });
-          const d = await r.json();
-          console.log("Resultado búsqueda inversa:", d);
-          if (d.found) {
-            setForm(f => ({...f,
-              isbn: d.isbn || f.isbn,
-              year: d.year || f.year,
-              publisher: d.publisher || f.publisher,
-              language: d.language || f.language,
-              genre: d.genre || f.genre,
-              cover: f.cover || d.cover || "",
-            }));
-          }
-        } catch(e) { console.error("Error búsqueda inversa:", e); }
-        await fetchEditorial(parsed.title, parsed.author);
-      }
+        if (parsed.isbn) await fetchByISBN(parsed.isbn, false);
+      else if (parsed.title && parsed.author) await fetchEditorial(parsed.title, parsed.author);
     } catch(e) { console.error("Error analizando imagen:", e); }
     setBusy("");
   };
