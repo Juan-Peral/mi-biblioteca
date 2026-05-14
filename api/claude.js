@@ -95,13 +95,13 @@ export default async function handler(req, res) {
     } catch(e) { console.log("Open Library error:", e.message); }
 
     console.log("ISBN not found for:", title, author);
-    return res.status(200).json({ found: false });
+    return res.status(200).json({ 
+  found: false, 
+  debug: {
+    searched: [title, author],
+    message: "Not found in Google Books or Open Library"
   }
-
-  if (body.image) {
-    const GEMINI_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_KEY) return res.status(500).json({ found: false, error: "GEMINI_API_KEY not set" });
-
+});
     const prompt = `Eres un experto bibliotecario. Analiza esta imagen de un libro (portada, lomo, contraportada o código de barras).
 Extrae toda la información visible: título completo con subtítulo, todos los autores, traductor, editorial, año, edición, ISBN (número de 13 dígitos bajo el código de barras).
 Si es la portada principal: isCover true.
