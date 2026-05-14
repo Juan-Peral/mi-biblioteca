@@ -102,63 +102,61 @@ function Scanner({ onResult, onClose }) {
   const rafRef = useRef(null);
   const [status, setStatus] = useState("Iniciando cámara...");
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
 
   const stop = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // Forzar siempre cámara trasera en móvil
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+  const startCamera = async () => {
+    try {
+      setStatus("Solicitando permiso de cámara...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (!video) return;
+      video.srcObject = stream;
+      video.onloadedmetadata = async () => {
+        try {
+          await video.play();
+          setReady(true);
+          setStatus("Cámara lista — apunta al código de barras");
+          if ("BarcodeDetector" in window) {
+            detectorRef.current = new BarcodeDetector({ formats:["ean_13","ean_8","upc_a","upc_e","code_128"] });
+            const scan = async () => {
+              if (!videoRef.current) return;
+              try {
+                const codes = await detectorRef.current.detect(videoRef.current);
+                if (codes.length) { stop(); onResult({ type:"isbn", value:codes[0].rawValue }); return; }
+              } catch(_) {}
+              rafRef.current = requestAnimationFrame(scan);
+            };
+            rafRef.current = requestAnimationFrame(scan);
+            setStatus("Detección activa — apunta al código de barras");
+          }
+        } catch(e) {
+          setError("Error al reproducir vídeo: " + e.message);
         }
-        setReady(true);
-        setStatus("Apunta al código de barras del libro");
+      };
+    } catch(e) {
+      setError("No se pudo acceder a la cámara: " + e.message);
+      setStatus("Error de cámara");
+    }
+  };
 
-        // Iniciar detección automática si está disponible
-        if ("BarcodeDetector" in window) {
-          detectorRef.current = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
-          const scan = async () => {
-            if (cancelled || !videoRef.current || videoRef.current.readyState < 2) {
-              if (!cancelled) rafRef.current = requestAnimationFrame(scan);
-              return;
-            }
-            try {
-              const codes = await detectorRef.current.detect(videoRef.current);
-              if (codes.length) {
-                stop();
-                onResult({ type:"isbn", value: codes[0].rawValue });
-                return;
-              }
-            } catch(_) {}
-            if (!cancelled) rafRef.current = requestAnimationFrame(scan);
-          };
-          rafRef.current = requestAnimationFrame(scan);
-          setStatus("Detección automática activa — apunta al código de barras");
-        } else {
-          setStatus("Captura una foto del código de barras o la portada");
-        }
-      } catch(e) {
-        if (!cancelled) setStatus("No se pudo acceder a la cámara. Usa 'Subir foto' en su lugar.");
-      }
-    })();
-    return () => { cancelled = true; stop(); };
+  useEffect(() => {
+    startCamera();
+    return stop;
   }, []);
 
   const capture = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const v = videoRef.current, c = canvasRef.current;
-    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.width = v.videoWidth || 640;
+    c.height = v.videoHeight || 480;
     c.getContext("2d").drawImage(v, 0, 0);
     stop();
     onResult({ type:"image", value: c.toDataURL("image/jpeg", 0.9) });
@@ -167,22 +165,18 @@ function Scanner({ onResult, onClose }) {
   return (
     <div style={{ textAlign:"center", color:C.text }}>
       <h3 style={{ margin:"0 0 8px", fontSize:17 }}>Escanear libro</h3>
-      <p style={{ fontSize:13, color:C.textSec, marginBottom:12 }}>{status}</p>
-      <div style={{ position:"relative", borderRadius:12, overflow:"hidden", background:"#000", marginBottom:12 }}>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:8 }}>{status}</p>
+      {error && <p style={{ fontSize:12, color:C.danger, marginBottom:8, padding:"8px", background:C.danger+"22", borderRadius:8 }}>{error}</p>}
+      <div style={{ position:"relative", borderRadius:12, overflow:"hidden", background:"#111", marginBottom:12, minHeight:200 }}>
         <video ref={videoRef} autoPlay playsInline muted style={{ width:"100%", maxHeight:320, display:"block", objectFit:"cover" }} />
-        {ready && (
-          <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
-            <div style={{ position:"absolute", top:"25%", left:"10%", right:"10%", bottom:"25%", border:`3px solid ${C.success}`, borderRadius:8, boxShadow:`0 0 0 9999px rgba(0,0,0,0.4)` }} />
-            <div style={{ position:"absolute", bottom:12, left:0, right:0, textAlign:"center", color:"#fff", fontSize:12 }}>
-              Mantén el código dentro del recuadro
-            </div>
-          </div>
-        )}
+        {ready && <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
+          <div style={{ position:"absolute", top:"25%", left:"10%", right:"10%", bottom:"25%", border:`3px solid ${C.success}`, borderRadius:8 }} />
+          <div style={{ position:"absolute", bottom:10, left:0, right:0, color:"#fff", fontSize:11 }}>Centra el código de barras en el recuadro</div>
+        </div>}
+        {!ready && !error && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:C.textSec, fontSize:13 }}>Iniciando...</div>}
       </div>
       <canvas ref={canvasRef} style={{ display:"none" }} />
-      <div style={{ display:"flex", gap:10, marginBottom:10 }}>
-        <Btn onClick={capture} style={{ flex:1 }} disabled={!ready}>📸 Capturar foto</Btn>
-      </div>
+      <Btn onClick={capture} full style={{ marginBottom:10 }} disabled={!ready}>📸 Capturar foto del código</Btn>
       <Btn onClick={() => { stop(); onClose(); }} variant="ghost" full>Cancelar</Btn>
     </div>
   );
